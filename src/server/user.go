@@ -133,7 +133,6 @@ func (this *User) SendMsg(msg string) {
 		
 }
 
-
 func (this *User) ListenMessage(){
 	for{
 		msg := <-this.C
