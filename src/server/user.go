@@ -3,6 +3,7 @@ package server
 import (
 	"net"
 	"strings"
+	"errors"
 )
 
 // User type
@@ -32,9 +33,7 @@ func CreateUser(conn net.Conn, server *Server) *User {
 	return user
 }
 
-
-
-//boardcast if user is Login
+//broadcast if user is Login
 func (this *User) Online() {
 	this.server.mapLock.Lock()
 	this.server.UserMap[this.Name] = this
@@ -58,6 +57,17 @@ func (this *User) sendSelfMessage(msg string) {
 func kickOffline(u *User) {
 	u.Conn.Close()
 }
+
+
+func (this *User) isCorrectFormat(s string) ([]string, error) {
+	parts := strings.Split(s,"|")
+	if len(parts) < 3 && parts[0] == "to"{
+			this.sendSelfMessage("The format of private message is: to|name|message")
+			return nil, errors.New("error")
+	}
+	return parts, nil
+}
+
 
 //user send message API
 func (this *User) SendMsg(msg string) {
@@ -85,15 +95,45 @@ func (this *User) SendMsg(msg string) {
 			this.sendSelfMessage("You have renamed to:" + this.Name)
 			return 
 		}
+	} else if len(msg) >= 3 && msg[:3] == "to|" {
+		//structure: to|name|message
+		//1. get user name
+		parts, err := this.isCorrectFormat(msg)
+		if err != nil{
+			return
+		}
+		remoteName := parts[1]
+		if remoteName == "" {
+			this.sendSelfMessage("The format of private message is: to|name|message")
+			return
+		}
+		
+		//2. get User object
+		targetUser, ok := this.server.UserMap[remoteName]
+		if !ok {
+			this.sendSelfMessage(remoteName + " seems Not online now")
+			return 
+		}
+		//3. get message and send by user.C
+		message := parts[2]
+
+		if message == "" {
+			this.sendSelfMessage("Empty message is not allowed")
+			return 
+		}
+		//fix issue that other user may kick or changename by private chat
+		targetUser.sendSelfMessage(this.Name + " said to you in private: " + message)
 	} else if msg == "exit" {
 		this.sendSelfMessage("Thanks for using,bye!")
 		kickOffline(this)
 		return
+	} else {
+		this.server.Broadcast(this, msg)
 	}
-	this.server.Broadcast(this, msg)
+		
 }
 
-//listen user channel,if user has message, send to client
+
 func (this *User) ListenMessage(){
 	for{
 		msg := <-this.C
