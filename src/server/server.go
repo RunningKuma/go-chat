@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"net"
 	"sync"
-	"github.com/RunningKuma/It-My-First-GO/src/user"
 )
 
 type Server struct {
 	Ip   string
 	Port int
 	//TODO:add user map&lock&channel}
-	UserMap map[string]*user.User
+	UserMap map[string]*User
 	mapLock sync.RWMutex
 
 	Message chan string
@@ -36,7 +35,7 @@ func (this *Server) ListenMessager() {
 }
 
 // method to boardcast message
-func (this *Server) Broadcast(user *user.User, msg string) {
+func (this *Server) Broadcast(user *User, msg string) {
 	sendMsg := "[" + user.Addr + "]" + user.Name + ":" + msg
 
 	this.Message <- sendMsg
@@ -46,13 +45,11 @@ func (this *Server) Broadcast(user *user.User, msg string) {
 
 func (this *Server) Handler(conn net.Conn) {
 	//work
-	user :=  user.CreateUser(conn)
+	user :=  CreateUser(conn, this)
 
+	user.Online()
 	//insert into user map
 	//REMEMBER LOCK
-	this.mapLock.Lock()
-	this.UserMap[user.Name] = user
-	this.mapLock.Unlock()
 	//boardcast user online message
 	//Receive user Message
 	go func() {
@@ -61,7 +58,7 @@ func (this *Server) Handler(conn net.Conn) {
 		n ,err := conn.Read(buf) 
 			
 		if n == 0 {
-			this.Broadcast(user, "is Offline")
+			user.Offline()
 			return 	
 		}
 
@@ -71,13 +68,12 @@ func (this *Server) Handler(conn net.Conn) {
 		}
 		msg := string(buf[:n-1])
 
-		this.Broadcast(user, msg)
+		user.SendMsg(msg)
 
 		}
 	}()
 
 
-	this.Broadcast(user, "is Login!")
 }
 
 
@@ -88,7 +84,7 @@ func NewServer(ip string, port int) *Server {
 		Ip:   ip,
 		Port: port,
 		//TODO:init user map
-		UserMap: make(map[string]*user.User),
+		UserMap: make(map[string]*User),
 		Message: make(chan string),	
 	}
 
