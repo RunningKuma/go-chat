@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 )
 
 type Server struct {
@@ -34,7 +35,8 @@ func (this *Server) ListenMessager() {
 	}
 }
 
-// method to boardcast message
+// method to boardcast message.
+// user is sender, msg is content, will send message to Server.Message channel 
 func (this *Server) Broadcast(user *User, msg string) {
 	sendMsg := "[" + user.Addr + "]" + user.Name + ": " + msg
 
@@ -42,7 +44,7 @@ func (this *Server) Broadcast(user *User, msg string) {
 }
 
 
-
+//Handler API
 func (this *Server) Handler(conn net.Conn) {
 	//work
 	user :=  CreateUser(conn, this)
@@ -52,6 +54,8 @@ func (this *Server) Handler(conn net.Conn) {
 	//REMEMBER LOCK
 	//boardcast user online message
 	//Receive user Message
+
+	is_live := make(chan bool) 
 	go func() {
 		buf := make([]byte, SIZE_MEDIUM)
 		for{
@@ -70,9 +74,22 @@ func (this *Server) Handler(conn net.Conn) {
 
 		user.SendMsg(msg)
 
+		is_live <- true
 		}
 	}()
+	
+	for {
+			select {
+				case <-is_live:
+				//do nothing,just for refresh
+				case <-time.After(time.Minute*30):
+					user.sendSelfMessage("You are kicked off for no activity in 30 minutes")
+					kickOffline(user)
+					close(user.C)
+					return 
 
+			}
+		}
 
 }
 
