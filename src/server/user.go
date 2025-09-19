@@ -2,7 +2,7 @@ package server
 
 import (
 	"net"
-
+	"strings"
 )
 
 // User type
@@ -11,7 +11,6 @@ type User struct {
 	Addr string
 	C chan string
 	Conn net.Conn
-
 	server *Server
 }
 
@@ -26,7 +25,7 @@ func CreateUser(conn net.Conn, server *Server) *User {
 		C:    make(chan string),
 		Conn: conn,
 		server: server,
-	}
+	} 
 	
 	go user.ListenMessage()
 
@@ -34,6 +33,8 @@ func CreateUser(conn net.Conn, server *Server) *User {
 }
 
 
+
+//boardcast if user is Login
 func (this *User) Online() {
 	this.server.mapLock.Lock()
 	this.server.UserMap[this.Name] = this
@@ -41,6 +42,7 @@ func (this *User) Online() {
 	this.server.Broadcast(this, "is Login!")
 }
 
+//boardcast if user is Offline
 func (this *User) Offline() {
 	this.server.mapLock.Lock()
 	delete(this.server.UserMap, this.Name)
@@ -48,14 +50,16 @@ func (this *User) Offline() {
 	this.server.Broadcast(this, "is Offline!")
 }
 
+//send message to self, not boardcast
 func (this *User) sendSelfMessage(msg string) {
 	this.Conn.Write([]byte(msg + "\n"))
 }
-
+//kick user offline(can use in many cases)
 func kickOffline(u *User) {
 	u.Conn.Close()
 }
 
+//user send message API
 func (this *User) SendMsg(msg string) {
 	if msg == "whoison"{
 		this.server.mapLock.Lock()
@@ -66,8 +70,22 @@ func (this *User) SendMsg(msg string) {
 		this.server.mapLock.Unlock()
 		this.sendSelfMessage(onlineMsg)
 		return
-	} else 
-	if msg == "exit" {
+	} else if len(msg) > 7 && msg[:7] == "rename|" {
+		newName := strings.Split(msg, "|")[1]
+		_, ok := this.server.UserMap[newName]
+		if ok {
+			this.sendSelfMessage("This name has been used!")
+			return
+		} else {
+			this.server.mapLock.Lock()
+			delete(this.server.UserMap, this.Name)
+			this.server.UserMap[newName] = this
+			this.server.mapLock.Unlock()
+			this.Name = newName
+			this.sendSelfMessage("You have renamed to:" + this.Name)
+			return 
+		}
+	} else if msg == "exit" {
 		this.sendSelfMessage("Thanks for using,bye!")
 		kickOffline(this)
 		return
@@ -76,7 +94,6 @@ func (this *User) SendMsg(msg string) {
 }
 
 //listen user channel,if user has message, send to client
-
 func (this *User) ListenMessage(){
 	for{
 		msg := <-this.C
