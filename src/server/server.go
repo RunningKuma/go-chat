@@ -36,7 +36,7 @@ func (this *Server) ListenMessager() {
 
 // method to boardcast message
 func (this *Server) Broadcast(user *User, msg string) {
-	sendMsg := "[" + user.Addr + "]" + user.Name + ":" + msg
+	sendMsg := "[" + user.Addr + "]" + user.Name + ": " + msg
 
 	this.Message <- sendMsg
 }

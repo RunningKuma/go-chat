@@ -48,7 +48,30 @@ func (this *User) Offline() {
 	this.server.Broadcast(this, "is Offline!")
 }
 
+func (this *User) sendSelfMessage(msg string) {
+	this.Conn.Write([]byte(msg + "\n"))
+}
+
+func kickOffline(u *User) {
+	u.Conn.Close()
+}
+
 func (this *User) SendMsg(msg string) {
+	if msg == "whoison"{
+		this.server.mapLock.Lock()
+		onlineMsg := "These user(s) are online:\n"
+		for _, user := range this.server.UserMap {
+			 onlineMsg += user.Addr + ":" + user.Name + "\n"
+		}
+		this.server.mapLock.Unlock()
+		this.sendSelfMessage(onlineMsg)
+		return
+	} else 
+	if msg == "exit" {
+		this.sendSelfMessage("Thanks for using,bye!")
+		kickOffline(this)
+		return
+	}
 	this.server.Broadcast(this, msg)
 }
 
