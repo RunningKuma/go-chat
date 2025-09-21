@@ -123,6 +123,16 @@ func (this *User) SendMsg(msg string) {
 		}
 		//fix issue that other user may kick or changename by private chat
 		targetUser.sendSelfMessage(this.Name + " said to you in private: " + message)
+	} else if len(msg) >= 5 && msg[:5] == "addr|" { 
+		//get addr of user
+		dist_name := strings.Split(msg, "|")[1]
+		dist_user, ok := this.server.UserMap[dist_name]
+		if !ok {
+			this.sendSelfMessage("The user does not exist")
+			return
+		}
+		this.sendSelfMessage(dist_name + "'s address is: " + dist_user.Addr)
+		return
 	} else if msg == "exit" {
 		this.sendSelfMessage("Thanks for using,bye!")
 		kickOffline(this)
